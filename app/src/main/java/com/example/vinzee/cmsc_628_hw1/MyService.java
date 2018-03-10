@@ -27,19 +27,25 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
     public LocationManager locationManager;
     public SensorManager sensorManager;
-    public Sensor accelerometer, gyroscope;
+    public Sensor accelerometer, gyroscope, gravitySensor;
     public static Handler myHandler = new Handler();
 
     public double latitude1 = 0.0, longitude1 = 0.0, latitude2 = 0.0, longitude2 = 0.0, distance = 0.0;
+    static final float NS2S = 1.0f / 1000000000.0f;
+    static final float R = 6371000; // meters
 
-    public float[] mAccelerometerData = null, mMagnetometerData = null, gyroscopeData = null;
+    public float[] linearAccelerationData = null, magnetometerData = null, gyroscopeData = null;
     public long lastUpdate;
     float[] lastAccel = new float[]{0.0f, 0.0f, 0.0f};
+    float[] lastVelocity = new float[]{0.0f, 0.0f, 0.0f};
+    float[] lastPosition = new float[]{0.0f, 0.0f, 0.0f};
+    float[] velocity = new float[]{0.0f, 0.0f, 0.0f};
+    float[] position = new float[]{0.0f, 0.0f, 0.0f};
 
     public MyService() {
     }
 
-    public class MyBinder extends Binder {
+    class MyBinder extends Binder {
         MyService getService() {
             return MyService.this;
         }
@@ -47,14 +53,43 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
     private class AccelWork implements Runnable {
         private float[] accel;
+        private long timestamp;
 
-        public AccelWork(float[] accel) {
+        AccelWork(float[] accel, long timestamp) {
             this.accel = accel;
+            this.timestamp = timestamp;
         }
 
         @Override
         public void run() {
-            calculateVelocity(accel);
+            calculateVelocity(accel, timestamp);
+        }
+    }
+
+    // Assuming constant acceleration, the formula is extremely simple: a = (V1-V0)/t.
+    // So, knowing the time and the acceleration, and assuming V0 = 0, then V1 = a*t
+    public void calculateVelocity(float[] accel, long curTime){
+        if ((curTime - lastUpdate) > 100) {
+            float diffTime = (curTime - lastUpdate) * NS2S; // TimeUnit.MILLISECONDS.toSeconds
+//            Log.d("calculateVelocity","diffTime: " + diffTime); // sample diffTime - 0.009915783
+
+            for(int i = 0; i < 3;++i){
+              velocity[i] += (accel[i] + lastAccel[i]) / 2 * diffTime;
+              position[i] += velocity[i] * diffTime;
+//              velocity[i] = lastVelocity[i] - accel[i] * diffTime;
+//              position[i] = lastPosition[i] - velocity[i] * diffTime;
+            }
+
+            Log.d("calculateVelocity","Velocity : " + Arrays.toString(velocity));
+            Log.d("calculateVelocity","Position : " + Arrays.toString(position));
+
+            calculateNewLatLong(position);
+            sendLocationToActivity();
+
+            lastAccel = accel;
+            lastVelocity = velocity;
+            lastPosition = position;
+            lastUpdate = curTime;
         }
     }
 
@@ -66,12 +101,14 @@ public class MyService extends Service implements LocationListener, SensorEventL
     @Override
     public void onCreate() {
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-//        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-//        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+//        gravitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
 //        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
 //
-//        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL); // SENSOR_DELAY_GAME
+        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL); // SENSOR_DELAY_GAME
 //        sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
+//        sensorManager.registerListener(this, gravitySensor, SensorManager.SENSOR_DELAY_NORMAL);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             Log.d("MyService", "Insufficient permissions");
@@ -90,61 +127,24 @@ public class MyService extends Service implements LocationListener, SensorEventL
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
         switch (sensorEvent.sensor.getType()) {
-            case Sensor.TYPE_ACCELEROMETER:
-                mAccelerometerData = sensorEvent.values.clone();
-
-                Log.d("onSensorChanged", "Raw Accel: " + Arrays.toString(mAccelerometerData));
-
-                float gravity[] = new float[3];
-                float linear_acceleration[] = new float[3];
-
-                final float alpha = 0.8f;
-
-                // Isolate the force of gravity with the low-pass filter.
-                gravity[0] = alpha * gravity[0] + (1 - alpha) * mAccelerometerData[0];
-                gravity[1] = alpha * gravity[1] + (1 - alpha) * mAccelerometerData[1];
-                gravity[2] = alpha * gravity[2] + (1 - alpha) * mAccelerometerData[2];
-
-                // Remove the gravity contribution with the high-pass filter.
-                linear_acceleration[0] = mAccelerometerData[0] - gravity[0];
-                linear_acceleration[1] = mAccelerometerData[1] - gravity[1];
-                linear_acceleration[2] = mAccelerometerData[2] - gravity[2];
-
-                Log.d("MySensorApp", "Gravity: " + Arrays.toString(gravity));
-                Log.d("MySensorApp", "Linear accel: " + Arrays.toString(linear_acceleration));
-
-                AccelWork accelWork = new AccelWork(linear_acceleration);
+            case Sensor.TYPE_LINEAR_ACCELERATION:
+                linearAccelerationData = sensorEvent.values.clone();
+                Log.d("onSensorChanged", "Linear Accel: " + Arrays.toString(linearAccelerationData));
+                AccelWork accelWork = new AccelWork(linearAccelerationData, sensorEvent.timestamp);
                 myHandler.post(accelWork);
-
+                break;
+            case Sensor.TYPE_GRAVITY:
+                Log.d("onSensorChanged", "Gravity: " + Arrays.toString(sensorEvent.values));
                 break;
             case Sensor.TYPE_MAGNETIC_FIELD:
-                mMagnetometerData = sensorEvent.values.clone();
-
-                Log.d("onSensorChanged", "Raw Gyro: " + Arrays.toString(mMagnetometerData));
-
+                magnetometerData = sensorEvent.values.clone();
+                Log.d("onSensorChanged", "Raw Gyro: " + Arrays.toString(magnetometerData));
                 break;
             case Sensor.TYPE_GYROSCOPE:
                 gyroscopeData = sensorEvent.values.clone();
-
                 Log.d("onSensorChanged", "Raw Gyro: " + Arrays.toString(gyroscopeData));
-
                 break;
             default:
-                return;
-        }
-
-        // A rotation matrix is a linear algebra term that translates the sensor data from one coordinate system
-        // to another—in this case, from the device's coordinate system to the Earth's coordinate system.
-        // That matrix is an array of nine float values, because each point (on all three axes) is expressed as a 3D vector.
-        // { Scale X, Skew X, Transform X
-        // Skew Y, Scale Y, Transform Y
-        // Perspective 0, Perspective 1, Perspective 2 }
-
-        if(mAccelerometerData != null && mMagnetometerData != null){
-            float[] rotationMatrix = new float[9];
-            boolean rotationOK = SensorManager.getRotationMatrix(rotationMatrix, null, mAccelerometerData, mMagnetometerData);
-
-            Log.d("onSensorChanged", "rotationMatrix: " + Arrays.toString(rotationMatrix) + "rotationOK: " + rotationOK);
         }
     }
 
@@ -158,7 +158,7 @@ public class MyService extends Service implements LocationListener, SensorEventL
         latitude1 = location.getLatitude();
         longitude1 = location.getLongitude();
 
-        Log.d("onLocationChanged", latitude1 + " : " + longitude1);
+//        Log.d("onLocationChanged", latitude1 + " : " + longitude1);
         sendLocationToActivity();
     }
 
@@ -177,37 +177,38 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
     }
 
-//    public int calculateHeight() {
-//        dlon = lon2 - lon1
-//        dlat = lat2 - lat1
-//        a = (sin(dlat/2))^2 + cos(lat1) * cos(lat2) * (sin(dlon/2))^2
-//        c = 2 * atan2( sqrt(a), sqrt(1-a) )
-//        d = R * c (where R is the radius of the Earth)
-//    }
-
-    public void calculateVelocity(float[] accel){
-        long curTime = System.currentTimeMillis();
-
-        if ((curTime - lastUpdate) > 100) {
-            long diffTime = (curTime - lastUpdate);
-            float velocity = Math.abs(accel[0] + accel[1] + accel[2] - lastAccel[0] - lastAccel[1] - lastAccel[2]) / diffTime * 10000;
-            float distance = (velocity * diffTime) / 1000;  // milliseconds to seconds
-
-            Log.d("calculateVelocity","Velocity : " + velocity);
-            Log.d("calculateVelocity","Distance : " + distance);
-
-            lastAccel = accel;
-            lastUpdate = curTime;
-        }
-    }
-
     private void sendLocationToActivity () {
         Intent intent = new Intent("locationValues");
+
+        calculateDistance();
         intent.putExtra("latitude1", latitude1);
         intent.putExtra("longitude1", longitude1);
         intent.putExtra("latitude2", latitude2);
         intent.putExtra("longitude2", longitude2);
         intent.putExtra("distance", distance);
+        intent.putExtra("velocity", velocity);
+        intent.putExtra("position", position);
+
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
+
+    private void calculateNewLatLong (float[] position) {
+        // latitude2
+        // longitude2
+    }
+
+    public double calculateDistance () {
+//        double dlon = longitude2 - longitude1;
+//        double dlat = latitude2 - latitude1;
+//
+//        double a = (Math.sin(dlat/2)) ^ 2 + Math.cos(latitude1) * Math.cos(latitude2) * (Math.sin(dlon/2))^2;
+//        double c = (2 * Math.atan2( Math.sqrt(a), Math.sqrt(1-a) ));
+//        double d = R * c; // (where R is the radius of the Earth);
+//
+//        return d;
+        return 0.0f;
+    }
+
+//    rad2deg <- function(rad) {(rad * 180) / (pi)}
+//    deg2rad <- function(deg) {(deg * pi) / (180)}
 }
