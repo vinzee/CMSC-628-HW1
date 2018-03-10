@@ -21,6 +21,11 @@ import android.util.Log;
 
 import java.util.Arrays;
 
+import static java.lang.Math.asin;
+import static java.lang.Math.atan2;
+import static java.lang.Math.cos;
+import static java.lang.StrictMath.sin;
+
 
 public class MyService extends Service implements LocationListener, SensorEventListener {
     private MyBinder myBinder = new MyBinder();
@@ -30,7 +35,7 @@ public class MyService extends Service implements LocationListener, SensorEventL
     public Sensor accelerometer, gyroscope, gravitySensor;
     public static Handler myHandler = new Handler();
 
-    public double latitude1 = 0.0, longitude1 = 0.0, latitude2 = 0.0, longitude2 = 0.0, distance = 0.0;
+    public double latitude1 = 0.0, longitude1 = 0.0, latitude2 = 0.0, longitude2 = 0.0, distance = 0.0, initialLatitude = 0.0, initialLongitude = 0.0;
     static final float NS2S = 1.0f / 1000000000.0f;
     static final float R = 6371000; // meters
 
@@ -158,7 +163,12 @@ public class MyService extends Service implements LocationListener, SensorEventL
         latitude1 = location.getLatitude();
         longitude1 = location.getLongitude();
 
+        if (initialLatitude == 0.0 && initialLongitude == 0.0){
+            initialLatitude = latitude1;
+            initialLongitude = longitude1;
+        }
 //        Log.d("onLocationChanged", latitude1 + " : " + longitude1);
+
         sendLocationToActivity();
     }
 
@@ -193,15 +203,41 @@ public class MyService extends Service implements LocationListener, SensorEventL
     }
 
     private void calculateNewLatLong (float[] position) {
-        // latitude2
-        // longitude2
+//        http://www.movable-type.co.uk/scripts/latlong.html
+
+//        https://stackoverflow.com/questions/8123049/calculate-bearing-between-two-locations-lat-long
+        double bearing = atan2(position[0], position[1]) * 180.0 / Math.PI;
+        if (bearing < 0.0){
+            bearing += 360.0;
+        } else if (bearing > 360.0) {
+            bearing -= 360;
+        }
+
+//            https://social.msdn.microsoft.com/Forums/sqlserver/en-US/c06aaf77-f6f9-420e-bc86-aed873b35a24/adding-distance-to-a-latitude-longitude-point?forum=sqlspatial
+//        https://social.msdn.microsoft.com/Forums/sqlserver/en-US/10829142-b6ae-4aca-aec6-4764d191e516/can-i-add-miles-to-a-point-to-get-another-point-?forum=sqlspatial#2512833f-717d-44c3-812f-04d37ad2ec07
+
+        float cosDist = position[0]; //        cos(distance/R)
+        float sinDist = position[1]; //        sin(distance/R)
+        Log.d("calculateVelocity","cosDist,sinDist: (" + cosDist + "," + sinDist);
+
+        latitude2 = asin(
+                sin(initialLatitude) * cosDist +
+                        cos(initialLatitude) * sinDist*cos(bearing)
+        );
+
+        longitude2 = initialLongitude + atan2(
+                sin(bearing) * sinDist * cos(initialLatitude),
+                cosDist - (sin(initialLatitude) * sin(latitude2))
+        );
+
+        Log.d("calculateVelocity","New lat,long: (" + latitude2 + "," + longitude2);
     }
 
     public double calculateDistance () {
-//        double dlon = longitude2 - longitude1;
-//        double dlat = latitude2 - latitude1;
-//
-//        double a = (Math.sin(dlat/2)) ^ 2 + Math.cos(latitude1) * Math.cos(latitude2) * (Math.sin(dlon/2))^2;
+        double dlon = toRadians(longitude2) - toRadians(longitude1);
+        double dlat = toRadians(latitude2) - toRadians(latitude1);
+
+//        double a = ((Math.sin(dlat/2)) ^ 2) + Math.cos(latitude1) * Math.cos(latitude2) * (Math.sin(dlon/2))^2;
 //        double c = (2 * Math.atan2( Math.sqrt(a), Math.sqrt(1-a) ));
 //        double d = R * c; // (where R is the radius of the Earth);
 //
@@ -209,6 +245,11 @@ public class MyService extends Service implements LocationListener, SensorEventL
         return 0.0f;
     }
 
-//    rad2deg <- function(rad) {(rad * 180) / (pi)}
-//    deg2rad <- function(deg) {(deg * pi) / (180)}
+    private double toDegrees (double radians) {
+        return (radians * 180) / (Math.PI);
+    }
+
+    private double toRadians (double degrees) {
+        return (degrees * Math.PI) / (180);
+    }
 }
