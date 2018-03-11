@@ -31,24 +31,16 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
     public LocationManager locationManager;
     public SensorManager sensorManager;
-    public Sensor accelerometer, gyroscope, magnetometer;
+    public Sensor accelerometer, gyroscope;
     public static Handler myHandler = new Handler();
 
     public double latitude1 = 0.0, longitude1 = 0.0, latitude2 = 0.0, longitude2 = 0.0, distance = 0.0, initialLatitude = 0.0, initialLongitude = 0.0;
     static final float NS2S = 1.0f / 1000000000.0f;
     static final float R = 6371000; // meters
 
-    public float[] linearAccelerationData = null, magnetometerData = null, gyroscopeData = null;
-    public long lastUpdate = 0;
-//    float[] lastAccel = new float[]{0.0f, 0.0f, 0.0f};
-//    float[] lastVelocity = new float[]{0.0f, 0.0f, 0.0f};
-//    float[] lastPosition = new float[]{0.0f, 0.0f, 0.0f};
-    float[] velocity = new float[]{0.0f, 0.0f, 0.0f};
-    float[] position = new float[]{0.0f, 0.0f, 0.0f};
-    float[] orientation = new float[3];
-    float[] rotationMatrix = new float[9];
-    float[] iMat = new float[9];
-    int azimuth = 0;
+    float[] velocity = new float[3];
+    float[] position = new float[3];
+    float[] rotation = new float[3];
 
     public MyService() {
     }
@@ -62,6 +54,7 @@ public class MyService extends Service implements LocationListener, SensorEventL
     private class AccelWork implements Runnable {
         private float[] accel;
         private long timestamp;
+        private long lastTimestamp = 0;
 
         AccelWork(float[] accel, long timestamp) {
             this.accel = accel;
@@ -70,39 +63,57 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
         @Override
         public void run() {
-            calculateVelocity(accel, timestamp);
+            if (lastTimestamp == 0 || (timestamp - lastTimestamp) > 100) {
+                float diffTime = (lastTimestamp == 0) ? 1 : ((timestamp - lastTimestamp) * NS2S);
+                Log.d("Calc","diffTime : " + diffTime);
+
+                for(int i = 0; i < 3;++i){
+                    if((accel[i] < 0.2) && (accel[i] > -0.2)) { accel[i] = 0; } // Mechanical Filtering (remove some noise)
+
+                    velocity[i] += (accel[i] * diffTime);
+                    position[i] += (((velocity[i] * diffTime) + ((accel[i] * diffTime * diffTime) / 2)));
+                }
+
+                Log.d("Calc","L.Accel: " + Arrays.toString(accel));
+                Log.d("Calc","Velocity : " + Arrays.toString(velocity));
+                Log.d("Calc","Position : " + Arrays.toString(position));
+
+//                calculateNewLatLong(position);
+                sendLocationToActivity();
+
+                lastTimestamp = timestamp;
+            }
         }
     }
 
-    // Assuming constant acceleration, the formula is extremely simple: a = (V1-V0)/t.
-    // So, knowing the time and the acceleration, and assuming V0 = 0, then V1 = a*t
-    public void calculateVelocity(float[] accel, long curTime){
-        if (lastUpdate == 0 || (curTime - lastUpdate) > 100) {
-            float diffTime = (lastUpdate == 0) ? 1 : ((curTime - lastUpdate) * NS2S);
-            Log.d("Calc","diffTime : " + diffTime);
+    private class GyroWork implements Runnable {
+        private float[] gyro;
+        private long timestamp;
+        private long lastTimestamp = 0;
+        private float estimated_error = 0.053f; // 0.33 / 2*PI;
 
-            for(int i = 0; i < 3;++i){
-                // Mechanical Filtering (remove some noise)
-                if((accel[i] < 0.2) && (accel[i] > -0.2)) { accel[i] = 0; }
+        GyroWork(float[] gyro, long timestamp) {
+            this.gyro = gyro;
+            this.timestamp = timestamp;
+        }
 
-                velocity[i] += (accel[i] * diffTime);
-                position[i] += (((velocity[i] * diffTime) + ((accel[i] * diffTime * diffTime) / 2)));
+        @Override
+        public void run() {
+            if (lastTimestamp == 0 || (timestamp - lastTimestamp) > 100) {
+                float diffTime = (lastTimestamp == 0) ? 1 : ((timestamp - lastTimestamp) * NS2S);
+                Log.d("Calc","diffTime : " + diffTime);
+
+                for(int i = 0; i < 3;++i){
+                    gyro[i] -= ( gyro[i] * (1 - estimated_error) ); // Mechanical Filtering (remove some noise)
+                    rotation[i] += (gyro[i] * diffTime);
+                }
+
+                Log.d("Calc","A.Accel: " + Arrays.toString(gyro));
+                Log.d("Calc","Rotation : " + Arrays.toString(rotation));
+                sendLocationToActivity();
+
+                lastTimestamp = timestamp;
             }
-
-            Log.d("Calc","L.Accel: " + Arrays.toString(accel));
-            Log.d("Calc","Velocity : " + Arrays.toString(velocity));
-            Log.d("Calc","Position : " + Arrays.toString(position));
-
-//            if(velocity[0] < 0) debug = "left";
-//            else if(velocity[0] > 0) { debug = "right" ; }
-
-            calculateNewLatLong(position);
-            sendLocationToActivity();
-
-//            lastAccel = accel;
-//            lastVelocity = velocity;
-//            lastPosition = position;
-            lastUpdate = curTime;
         }
     }
 
@@ -117,12 +128,14 @@ public class MyService extends Service implements LocationListener, SensorEventL
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
 
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
-        magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
 
-        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI);
-        sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_UI);
-        sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_UI);
+        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME);
+        sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_GAME);
+
+//        Magnetometer not present in my android device !
+//        magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+//        sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_GAME);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             Log.d("MyService", "Insufficient permissions");
@@ -142,31 +155,19 @@ public class MyService extends Service implements LocationListener, SensorEventL
     public void onSensorChanged(SensorEvent sensorEvent) {
         switch (sensorEvent.sensor.getType()) {
             case Sensor.TYPE_LINEAR_ACCELERATION:
-                linearAccelerationData = sensorEvent.values.clone();
-//                Log.d("onSensorChanged", "Linear Accel: " + Arrays.toString(linearAccelerationData));
+                float[] linearAccelerationData = sensorEvent.values.clone();
                 AccelWork accelWork = new AccelWork(linearAccelerationData, sensorEvent.timestamp);
                 myHandler.post(accelWork);
-                break;
-            case Sensor.TYPE_MAGNETIC_FIELD:
-                magnetometerData = sensorEvent.values.clone();
-                Log.d("onSensorChanged", "Raw Magnet: " + Arrays.toString(magnetometerData));
+//                Log.d("onSensorChanged", "Linear Accel: " + Arrays.toString(linearAccelerationData));
                 break;
             case Sensor.TYPE_GYROSCOPE:
-                gyroscopeData = sensorEvent.values.clone();
+                float[] gyroscopeData = sensorEvent.values.clone();
+                GyroWork gyroWork = new GyroWork(gyroscopeData, sensorEvent.timestamp);
+                myHandler.post(gyroWork);
 //                Log.d("onSensorChanged", "Raw Gyro: " + Arrays.toString(gyroscopeData));
                 break;
             default:
                 Log.d("onSensorChanged", "Untracked Sensor event: " + sensorEvent.sensor.getType());
-        }
-
-        if ( linearAccelerationData != null && magnetometerData != null && SensorManager.getRotationMatrix( rotationMatrix, iMat, linearAccelerationData, magnetometerData ) ) {
-            Log.d("onSensorChanged", "rotationMatrix: " + Arrays.toString(rotationMatrix));
-
-            azimuth = (int) ( Math.toDegrees( SensorManager.getOrientation( rotationMatrix, orientation )[0] ) + 360 ) % 360;
-            Log.d("onSensorChanged", "rotation: " + azimuth);
-
-            float rotation = -azimuth * 360 / (2 * 3.14159f);
-            Log.d("onSensorChanged", "rotation: " + rotation);
         }
     }
 
@@ -221,14 +222,16 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
     private void calculateNewLatLong (float[] position) {
 //        http://www.movable-type.co.uk/scripts/latlong.html
-
 //        https://stackoverflow.com/questions/8123049/calculate-bearing-between-two-locations-lat-long
+
         double bearing = atan2(position[0], position[1]) * 180.0 / Math.PI;
         if (bearing < 0.0){
             bearing += 360.0;
         } else if (bearing > 360.0) {
             bearing -= 360;
         }
+
+        Log.d("Calc","Lat2,Lng2: " + latitude2 + "," + longitude2);
 
 //            https://social.msdn.microsoft.com/Forums/sqlserver/en-US/c06aaf77-f6f9-420e-bc86-aed873b35a24/adding-distance-to-a-latitude-longitude-point?forum=sqlspatial
 //        https://social.msdn.microsoft.com/Forums/sqlserver/en-US/10829142-b6ae-4aca-aec6-4764d191e516/can-i-add-miles-to-a-point-to-get-another-point-?forum=sqlspatial#2512833f-717d-44c3-812f-04d37ad2ec07
