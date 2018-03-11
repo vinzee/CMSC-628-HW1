@@ -55,7 +55,7 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
     class MyBinder extends Binder {
         MyService getService() {
-            reqqturn MyService.this;
+            return MyService.this;
         }
     }
 
