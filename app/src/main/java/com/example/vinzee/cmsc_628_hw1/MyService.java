@@ -26,7 +26,6 @@ import static java.lang.Math.atan2;
 import static java.lang.Math.cos;
 import static java.lang.StrictMath.sin;
 
-
 public class MyService extends Service implements LocationListener, SensorEventListener {
     private MyBinder myBinder = new MyBinder();
 
@@ -40,16 +39,17 @@ public class MyService extends Service implements LocationListener, SensorEventL
     static final float R = 6371000; // meters
 
     public float[] linearAccelerationData = null, magnetometerData = null, gyroscopeData = null;
-    public long lastUpdate;
-    float[] lastAccel = new float[]{0.0f, 0.0f, 0.0f};
-    float[] lastVelocity = new float[]{0.0f, 0.0f, 0.0f};
-    float[] lastPosition = new float[]{0.0f, 0.0f, 0.0f};
+    public long lastUpdate = 0;
+//    float[] lastAccel = new float[]{0.0f, 0.0f, 0.0f};
+//    float[] lastVelocity = new float[]{0.0f, 0.0f, 0.0f};
+//    float[] lastPosition = new float[]{0.0f, 0.0f, 0.0f};
     float[] velocity = new float[]{0.0f, 0.0f, 0.0f};
     float[] position = new float[]{0.0f, 0.0f, 0.0f};
     float[] orientation = new float[3];
     float[] rotationMatrix = new float[9];
     float[] iMat = new float[9];
     int azimuth = 0;
+
     public MyService() {
     }
 
@@ -77,19 +77,21 @@ public class MyService extends Service implements LocationListener, SensorEventL
     // Assuming constant acceleration, the formula is extremely simple: a = (V1-V0)/t.
     // So, knowing the time and the acceleration, and assuming V0 = 0, then V1 = a*t
     public void calculateVelocity(float[] accel, long curTime){
-        if ((curTime - lastUpdate) > 100) {
-            float diffTime = (curTime - lastUpdate) * NS2S; // sample diffTime - 0.009915783
+        if (lastUpdate == 0 || (curTime - lastUpdate) > 100) {
+            float diffTime = (lastUpdate == 0) ? 1 : ((curTime - lastUpdate) * NS2S);
+            Log.d("Calc","diffTime : " + diffTime);
 
             for(int i = 0; i < 3;++i){
-//              Mechanical Filtering (remove some noise)
+                // Mechanical Filtering (remove some noise)
                 if((accel[i] < 0.2) && (accel[i] > -0.2)) { accel[i] = 0; }
 
-                velocity[i] += accel[i] * diffTime; //  + lastAccel[i]) / 2
-                position[i] += velocity[i] * diffTime + (accel[i] * diffTime * diffTime) / 2;
+                velocity[i] += (accel[i] * diffTime);
+                position[i] += (((velocity[i] * diffTime) + ((accel[i] * diffTime * diffTime) / 2)));
             }
 
-            Log.d("calculateVelocity","Velocity : " + Arrays.toString(velocity));
-            Log.d("calculateVelocity","Position : " + Arrays.toString(position));
+            Log.d("Calc","L.Accel: " + Arrays.toString(accel));
+            Log.d("Calc","Velocity : " + Arrays.toString(velocity));
+            Log.d("Calc","Position : " + Arrays.toString(position));
 
 //            if(velocity[0] < 0) debug = "left";
 //            else if(velocity[0] > 0) { debug = "right" ; }
@@ -97,9 +99,9 @@ public class MyService extends Service implements LocationListener, SensorEventL
             calculateNewLatLong(position);
             sendLocationToActivity();
 
-            lastAccel = accel;
-            lastVelocity = velocity;
-            lastPosition = position;
+//            lastAccel = accel;
+//            lastVelocity = velocity;
+//            lastPosition = position;
             lastUpdate = curTime;
         }
     }
@@ -141,25 +143,25 @@ public class MyService extends Service implements LocationListener, SensorEventL
         switch (sensorEvent.sensor.getType()) {
             case Sensor.TYPE_LINEAR_ACCELERATION:
                 linearAccelerationData = sensorEvent.values.clone();
-                Log.d("onSensorChanged", "Linear Accel: " + Arrays.toString(linearAccelerationData));
+//                Log.d("onSensorChanged", "Linear Accel: " + Arrays.toString(linearAccelerationData));
                 AccelWork accelWork = new AccelWork(linearAccelerationData, sensorEvent.timestamp);
                 myHandler.post(accelWork);
                 break;
-            case Sensor.TYPE_GRAVITY:
-                Log.d("onSensorChanged", "Gravity: " + Arrays.toString(sensorEvent.values));
-                break;
             case Sensor.TYPE_MAGNETIC_FIELD:
                 magnetometerData = sensorEvent.values.clone();
-                Log.d("onSensorChanged", "Raw Gyro: " + Arrays.toString(magnetometerData));
+                Log.d("onSensorChanged", "Raw Magnet: " + Arrays.toString(magnetometerData));
                 break;
             case Sensor.TYPE_GYROSCOPE:
                 gyroscopeData = sensorEvent.values.clone();
-                Log.d("onSensorChanged", "Raw Gyro: " + Arrays.toString(gyroscopeData));
+//                Log.d("onSensorChanged", "Raw Gyro: " + Arrays.toString(gyroscopeData));
                 break;
             default:
+                Log.d("onSensorChanged", "Untracked Sensor event: " + sensorEvent.sensor.getType());
         }
 
-        if ( SensorManager.getRotationMatrix( rotationMatrix, iMat, linearAccelerationData, magnetometerData ) ) {
+        if ( linearAccelerationData != null && magnetometerData != null && SensorManager.getRotationMatrix( rotationMatrix, iMat, linearAccelerationData, magnetometerData ) ) {
+            Log.d("onSensorChanged", "rotationMatrix: " + Arrays.toString(rotationMatrix));
+
             azimuth = (int) ( Math.toDegrees( SensorManager.getOrientation( rotationMatrix, orientation )[0] ) + 360 ) % 360;
             Log.d("onSensorChanged", "rotation: " + azimuth);
 
@@ -233,7 +235,6 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
         float cosDist = position[0]; //        cos(distance/R)
         float sinDist = position[1]; //        sin(distance/R)
-        Log.d("calculateVelocity","cosDist,sinDist: (" + cosDist + "," + sinDist);
 
         latitude2 = asin(
                 sin(initialLatitude) * cosDist +
@@ -245,7 +246,7 @@ public class MyService extends Service implements LocationListener, SensorEventL
                 cosDist - (sin(initialLatitude) * sin(latitude2))
         );
 
-        Log.d("calculateVelocity","New lat,long: (" + latitude2 + "," + longitude2);
+        Log.d("Calc","Lat2,Lng2: " + latitude2 + "," + longitude2);
     }
 
     public double calculateDistance () {

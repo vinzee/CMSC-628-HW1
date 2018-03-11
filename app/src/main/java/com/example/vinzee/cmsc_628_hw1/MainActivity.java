@@ -20,8 +20,6 @@ import android.util.Log;
 import android.widget.EditText;
 import android.widget.Toast;
 
-import java.util.Arrays;
-
 public class MainActivity extends AppCompatActivity {
     EditText latitudeEditText, longitudeEditText, latitude2EditText, longitude2EditText, distanceEditText;
     EditText position1EditText, position2EditText, position3EditText;
@@ -58,8 +56,7 @@ public class MainActivity extends AppCompatActivity {
             velocity1EditText.setText(Float.valueOf(this.velocity[0]).toString());
             velocity2EditText.setText(Float.valueOf(this.velocity[1]).toString());
             velocity3EditText.setText(Float.valueOf(this.velocity[2]).toString());
-
-            Toast.makeText(getApplicationContext(), "Locations Updated", Toast.LENGTH_SHORT).show();
+//            Toast.makeText(getApplicationContext(), "Locations Updated", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -99,6 +96,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+//        myService.stopService();
+    }
+
     private ServiceConnection myServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder iBinder) {
@@ -132,7 +135,6 @@ public class MainActivity extends AppCompatActivity {
 
             switch(action){
                 case "locationValues":
-                    Log.d("BroadcastReceiver", Arrays.toString(intent.getFloatArrayExtra("position")));
                     locationWork = new LocationWork(
                             intent.getDoubleExtra("latitude1", 0),
                             intent.getDoubleExtra("longitude1", 0),
