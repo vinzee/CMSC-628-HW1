@@ -22,24 +22,19 @@ import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
     EditText latitudeEditText, longitudeEditText, latitude2EditText, longitude2EditText, distanceEditText;
-    EditText position1EditText, position2EditText, position3EditText;
-    EditText velocity1EditText, velocity2EditText, velocity3EditText;
 
     private MyService myService;
     public static Handler myHandler = new Handler();
 
     private class LocationWork implements Runnable {
         private double latitude1, longitude1, latitude2, longitude2, distance;
-        private float[] velocity, position;
 
-        public LocationWork (double latitude1, double longitude1, double latitude2, double longitude2, double distance, float[] velocity, float[] position) {
+        public LocationWork (double latitude1, double longitude1, double latitude2, double longitude2, double distance) {
             this.latitude1 = latitude1;
             this.longitude1 = longitude1;
             this.latitude2 = latitude2;
             this.longitude2 = longitude2;
             this.distance = distance;
-            this.velocity = velocity;
-            this.position = position;
         }
 
         @Override
@@ -49,14 +44,6 @@ public class MainActivity extends AppCompatActivity {
             latitude2EditText.setText(Double.valueOf(this.latitude2).toString());
             longitude2EditText.setText(Double.valueOf(this.longitude2).toString());
             distanceEditText.setText(Double.valueOf(this.distance).toString());
-
-            position1EditText.setText(Float.valueOf(this.position[0]).toString());
-            position2EditText.setText(Float.valueOf(this.position[1]).toString());
-            position3EditText.setText(Float.valueOf(this.position[2]).toString());
-            velocity1EditText.setText(Float.valueOf(this.velocity[0]).toString());
-            velocity2EditText.setText(Float.valueOf(this.velocity[1]).toString());
-            velocity3EditText.setText(Float.valueOf(this.velocity[2]).toString());
-//            Toast.makeText(getApplicationContext(), "Locations Updated", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -71,13 +58,6 @@ public class MainActivity extends AppCompatActivity {
         latitude2EditText = findViewById(R.id.lat2);
         longitude2EditText = findViewById(R.id.lng2);
         distanceEditText = findViewById(R.id.distance);
-
-        position1EditText = findViewById(R.id.position1);
-        position2EditText = findViewById(R.id.position2);
-        position3EditText = findViewById(R.id.position3);
-        velocity1EditText = findViewById(R.id.velocity1);
-        velocity2EditText = findViewById(R.id.velocity2);
-        velocity3EditText = findViewById(R.id.velocity3);
 
         Intent myIntent = new Intent(this, MyService.class);
         bindService(myIntent, myServiceConnection, BIND_AUTO_CREATE);
@@ -140,9 +120,7 @@ public class MainActivity extends AppCompatActivity {
                             intent.getDoubleExtra("longitude1", 0),
                             intent.getDoubleExtra("latitude2", 0),
                             intent.getDoubleExtra("longitude2", 0),
-                            intent.getDoubleExtra("height", 0),
-                            intent.getFloatArrayExtra("position"),
-                            intent.getFloatArrayExtra("velocity")
+                            intent.getDoubleExtra("distance", 0)
                     );
 
                     myHandler.post(locationWork);

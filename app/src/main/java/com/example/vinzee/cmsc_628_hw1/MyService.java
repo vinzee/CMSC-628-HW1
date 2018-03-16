@@ -20,8 +20,6 @@ import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.widget.Toast;
 
-import java.util.Arrays;
-
 import static java.lang.Math.atan2;
 import static java.lang.Math.cos;
 import static java.lang.StrictMath.sin;
@@ -70,7 +68,7 @@ public class MyService extends Service implements LocationListener, SensorEventL
         public void run() {
             if (lastTimestampAccel == 0 || (timestamp - lastTimestampAccel) > 100) {
                 float diffTime = (lastTimestampAccel == 0) ? 1 : ((timestamp - lastTimestampAccel) * NS2S);
-                Log.d("Calc","diffTime : " + diffTime + " : " + lastTimestampAccel + " : " + timestamp);
+//                Log.d("Calc", "diffTime : " + diffTime);
 
                 double currentAcceleration = 0.0, currentSpeed = 0.0, currentDistance = 0.0;
                 for(int i = 0; i < 3;++i){
@@ -89,9 +87,9 @@ public class MyService extends Service implements LocationListener, SensorEventL
                 currentDistance =  (float) Math.sqrt(Math.pow(accel[0], 2) + Math.pow(accel[1], 2) + Math.pow(accel[2], 2));
                 currentDistance = currentDistance / 1000;
 
-                Log.d("Calc","L.Accel: " + Arrays.toString(accel) + " $$ " + currentAcceleration);
-                Log.d("Calc","Velocity : " + Arrays.toString(velocity) + " $$ " + currentSpeed);
-                Log.d("Calc","Distance : " + Arrays.toString(position) + " $$ " + currentDistance);
+//                Log.d("Calc","L.Accel: " + Arrays.toString(accel) + " $$ " + currentAcceleration);
+//                Log.d("Calc","Velocity : " + Arrays.toString(velocity) + " $$ " + currentSpeed);
+//                Log.d("Calc","Distance : " + Arrays.toString(position) + " $$ " + currentDistance);
 
                 lastTimestampAccel = timestamp;
 
@@ -115,7 +113,7 @@ public class MyService extends Service implements LocationListener, SensorEventL
                         longitude2 = Math.toDegrees(longitude2);
                         distance = calculateDistance();
 
-                        Log.d("distance", distance + "");
+//                        Log.d("distance", distance + "");
                     }
                     prevAcceleration = currentAcceleration;
                     prevSpeed = currentSpeed;
@@ -128,41 +126,9 @@ public class MyService extends Service implements LocationListener, SensorEventL
         }
     }
 
-//    private class GyroWork implements Runnable {
-//        private float[] gyro;
-//        private long timestamp;
-//        private float estimated_error = 0.053f; // 0.33 / 2*PI;
-//
-//        GyroWork(float[] gyro, long timestamp) {
-//            this.gyro = gyro;
-//            this.timestamp = timestamp;
-//        }
-//
-//        @Override
-//        public void run() {
-//            if (lastTimestampGyro == 0 || (timestamp - lastTimestampGyro) > 100) {
-//                float diffTime = (lastTimestampGyro == 0) ? 1 : ((timestamp - lastTimestampGyro) * NS2S);
-//                Log.d("Calc","diffTime : " + diffTime + " : " + lastTimestampGyro + " : " + timestamp);
-//
-//                for(int i = 0; i < 3;++i){
-////                    gyro[i] -= ( gyro[i] * (1 - estimated_error) ); // Mechanical Filtering (remove some noise)
-//                    rotation[i] += (gyro[i] * diffTime);
-//                }
-//
-//                Log.d("Calc","A.Accel: " + Arrays.toString(gyro));
-//                Log.d("Calc","Rotation : " + Arrays.toString(rotation));
-//                sendLocationToActivity();
-//
-//                lastTimestampGyro = timestamp;
-//            }
-//        }
-//    }
-
     private class CompassWork implements Runnable {
         @Override
         public void run() {
-//          https://stackoverflow.com/questions/17603873/type-rotation-vector-type-orientation-give-different-results-that-too-with-devi
-
             float[] rotationMatrix = new float[16];
             float[] orientationValues = new float[3];
 
@@ -170,11 +136,9 @@ public class MyService extends Service implements LocationListener, SensorEventL
             SensorManager.getOrientation(rotationMatrix, orientationValues);
 
             double azimuth = Math.toDegrees(orientationValues[0]);
-//            double pitch = Math.toDegrees(orientationValues[1]);
-//            double roll = Math.toDegrees(orientationValues[2]);
             currentDirection = (azimuth + 360) % 360;
 
-            Log.d("Calc", "Orientation: " + azimuth + " , currentDirection: " + currentDirection); //  + " , " + pitch + " , " + roll
+//            Log.d("Calc", "CurrentDirection: " + currentDirection);
         }
     }
 
@@ -190,13 +154,9 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
-//        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-//        magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME);
         sensorManager.registerListener(this, rotationVectorSensor, SensorManager.SENSOR_DELAY_GAME);
-//        sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_GAME);
-//        sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_GAME);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             Log.d("MyService", "Insufficient permissions");
@@ -207,11 +167,9 @@ public class MyService extends Service implements LocationListener, SensorEventL
         boolean gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
         boolean networkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
 
-        if (gpsEnabled) {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
-        } else if (networkEnabled){
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, this);
-        } else {
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, this);
+        if (!gpsEnabled && !networkEnabled) {
             Toast.makeText(this, "GPS and Network providers not enabled", Toast.LENGTH_SHORT).show();
         }
     }
@@ -225,26 +183,12 @@ public class MyService extends Service implements LocationListener, SensorEventL
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
         switch (sensorEvent.sensor.getType()) {
-//            case Sensor.TYPE_ACCELEROMETER:
-//                accelData = sensorEvent.values.clone();
-//                Log.d("onSensorChanged", "Linear Accel: " + Arrays.toString(accelData));
-////            break;
             case Sensor.TYPE_LINEAR_ACCELERATION:
                 linearAccelerationData = sensorEvent.values.clone();
                 AccelWork accelWork = new AccelWork(linearAccelerationData, sensorEvent.timestamp);
                 myHandler.post(accelWork);
 //                Log.d("onSensorChanged", "Linear Accel: " + Arrays.toString(linearAccelerationData));
                 break;
-//            case Sensor.TYPE_MAGNETIC_FIELD:
-//                compassData = sensorEvent.values.clone();
-////                Log.d("onSensorChanged", "Compass: " + Arrays.toString(compassData));
-//                break;
-//            case Sensor.TYPE_GYROSCOPE:
-//                float[] gyroscopeData = sensorEvent.values.clone();
-//                GyroWork gyroWork = new GyroWork(gyroscopeData, sensorEvent.timestamp);
-//                myHandler.post(gyroWork);
-////                Log.d("onSensorChanged", "Raw Gyro: " + Arrays.toString(gyroscopeData));
-//                break;
             case Sensor.TYPE_ROTATION_VECTOR:
                 rotationVector = sensorEvent.values.clone();
 //                Log.d("onSensorChanged", "rotationVector: " + Arrays.toString(rotationVector));
@@ -271,6 +215,8 @@ public class MyService extends Service implements LocationListener, SensorEventL
             if (initialLatitude == 0.0 && initialLongitude == 0.0){
                 initialLatitude = latitude1;
                 initialLongitude = longitude1;
+                latitude2 = latitude1;
+                longitude2 = longitude1;
             }
 
             sendLocationToActivity();
@@ -300,8 +246,6 @@ public class MyService extends Service implements LocationListener, SensorEventL
         intent.putExtra("latitude2", latitude2);
         intent.putExtra("longitude2", longitude2);
         intent.putExtra("distance", distance);
-        intent.putExtra("velocity", velocity);
-        intent.putExtra("position", position);
 
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
