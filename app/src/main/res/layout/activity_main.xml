@@ -14,20 +14,6 @@
         tools:layout_editor_absoluteY="0dp"
         tools:ignore="MissingConstraints">
 
-        <!--<LinearLayout-->
-            <!--android:layout_width="match_parent"-->
-            <!--android:layout_height="wrap_content"-->
-            <!--android:orientation="horizontal"-->
-            <!--tools:layout_editor_absoluteX="0dp"-->
-            <!--tools:layout_editor_absoluteY="0dp">-->
-
-            <!--<Button-->
-                <!--android:id="@+id/button2"-->
-                <!--android:layout_width="wrap_content"-->
-                <!--android:layout_height="match_parent"-->
-                <!--android:text="Fetch Location" />-->
-        <!--</LinearLayout>-->
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -39,6 +25,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_margin="10dp"
                 android:layout_weight="0.3"
                 android:maxLines="1"
                 android:text="Method 1"
@@ -60,7 +47,7 @@
                 android:layout_weight="1"
                 android:ems="10"
                 android:hint="Latitude 1"
-                android:inputType="numberDecimal"
+                android:inputType="none"
                 />
 
             <EditText
@@ -70,14 +57,14 @@
                 android:layout_weight="1"
                 android:ems="10"
                 android:hint="Longitude 1"
-                android:inputType="numberDecimal" />
+                android:inputType="none" />
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="30dp"
             tools:layout_editor_absoluteX="0dp"
             tools:layout_editor_absoluteY="0dp">
 
@@ -86,6 +73,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="0.3"
                 android:maxLines="1"
+                android:layout_margin="10dp"
                 android:text="Method 2"
                 android:textAppearance="@style/TextAppearance.AppCompat.Large" />
         </LinearLayout>
@@ -104,7 +92,7 @@
                 android:layout_weight="1"
                 android:ems="10"
                 android:hint="Latitude 2"
-                android:inputType="numberDecimal"
+                android:inputType="none"
                 />
 
             <EditText
@@ -114,7 +102,7 @@
                 android:layout_weight="1"
                 android:ems="10"
                 android:hint="Longitude 2"
-                android:inputType="numberDecimal" />
+                android:inputType="none" />
         </LinearLayout>
 
         <LinearLayout
@@ -130,6 +118,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="0.3"
                 android:maxLines="1"
+                android:layout_margin="10dp"
                 android:text="Distance"
                 android:textAppearance="@style/TextAppearance.AppCompat.Large" />
         </LinearLayout>
@@ -148,7 +137,28 @@
                 android:layout_weight="1"
                 android:ems="10"
                 android:hint="Distance"
-                android:inputType="numberDecimal" />
+                android:inputType="none"
+                />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            tools:layout_editor_absoluteX="0dp"
+            tools:layout_editor_absoluteY="0dp"
+            android:gravity="center"
+            android:layout_marginTop="20dp"
+            >
+
+            <Button
+                android:id="@+id/button"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:text="Fetch Location"
+                android:textAlignment="center"
+                android:textAppearance="@style/TextAppearance.AppCompat.Button"
+                android:textSize="20sp" />
         </LinearLayout>
 
     </LinearLayout>

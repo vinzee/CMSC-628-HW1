@@ -29,7 +29,7 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
     public LocationManager locationManager;
     public SensorManager sensorManager;
-    public Sensor accelerometer, gyroscope, rotationVectorSensor, magnetometer;
+    public Sensor accelerometer, rotationVectorSensor;
     public static Handler myHandler = new Handler();
 
     public double latitude1 = 0.0, longitude1 = 0.0, latitude2 = 0.0, longitude2 = 0.0, distance = 0.0, initialLatitude = 0.0, initialLongitude = 0.0;
@@ -37,12 +37,10 @@ public class MyService extends Service implements LocationListener, SensorEventL
     static final float R = 6371000; // meters
 
     long lastTimestampAccel = 0;
-//    long lastTimestampGyro = 0;
     float[] velocity = new float[3];
     float[] position = new float[3];
-//    float[] rotation = new float[3];
     float[] rotationVector = new float[16];
-    float[] linearAccelerationData, accelData; // , compassData;
+    float[] linearAccelerationData;
     double currentDirection;
     double prevAcceleration = 0.0, prevSpeed = 0.0, prevDistance = 0.0;
 
@@ -68,11 +66,13 @@ public class MyService extends Service implements LocationListener, SensorEventL
         public void run() {
             if (lastTimestampAccel == 0 || (timestamp - lastTimestampAccel) > 100) {
                 float diffTime = (lastTimestampAccel == 0) ? 1 : ((timestamp - lastTimestampAccel) * NS2S);
-//                Log.d("Calc", "diffTime : " + diffTime);
-
                 double currentAcceleration = 0.0, currentSpeed = 0.0, currentDistance = 0.0;
+
                 for(int i = 0; i < 3;++i){
-                    if((accel[i] < 0.2) && (accel[i] > -0.2)) { accel[i] = 0; } // Mechanical Filtering (remove some noise)
+                    // Mechanical Filtering (remove some noise)
+                    if((accel[i] < 0.2) && (accel[i] > -0.2)) {
+                        accel[i] = 0;
+                    }
 
                     velocity[i] += (accel[i] * diffTime);
                     position[i] += (((velocity[i] * diffTime) + ((accel[i] * diffTime * diffTime) / 2)));
@@ -87,10 +87,6 @@ public class MyService extends Service implements LocationListener, SensorEventL
                 currentDistance =  (float) Math.sqrt(Math.pow(accel[0], 2) + Math.pow(accel[1], 2) + Math.pow(accel[2], 2));
                 currentDistance = currentDistance / 1000;
 
-//                Log.d("Calc","L.Accel: " + Arrays.toString(accel) + " $$ " + currentAcceleration);
-//                Log.d("Calc","Velocity : " + Arrays.toString(velocity) + " $$ " + currentSpeed);
-//                Log.d("Calc","Distance : " + Arrays.toString(position) + " $$ " + currentDistance);
-
                 lastTimestampAccel = timestamp;
 
                 if(currentAcceleration != prevAcceleration || currentSpeed != prevSpeed || prevDistance != currentDistance) {
@@ -100,14 +96,15 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
                         currentDirection = (float) (Math.PI * currentDirection / 180.0);
 
-                        latitude2 = Math.asin(sin(initialLatitudeTemp) * cos(currentDistance / R) +
-                                cos(initialLatitudeTemp) * sin(currentDistance / R) * cos(currentDirection));
+                        latitude2 = Math.asin(
+                                sin(initialLatitudeTemp) * cos(currentDistance / R) +
+                                cos(initialLatitudeTemp) * sin(currentDistance / R) * cos(currentDirection)
+                        );
 
-                        longitude2 = initialLongitudeTemp
-                                + atan2(
-                                        sin(currentDirection) * sin(currentDistance / R) * cos(initialLatitudeTemp) ,
-                                        cos(currentDistance / R)  - sin(initialLatitudeTemp) * sin(latitude2)
-                                );
+                        longitude2 = initialLongitudeTemp + atan2(
+                                sin(currentDirection) * sin(currentDistance / R) * cos(initialLatitudeTemp) ,
+                                cos(currentDistance / R)  - sin(initialLatitudeTemp) * sin(latitude2)
+                        );
 
                         latitude2 = Math.toDegrees(latitude2);
                         longitude2 = Math.toDegrees(longitude2);
@@ -126,6 +123,15 @@ public class MyService extends Service implements LocationListener, SensorEventL
         }
     }
 
+    public double calculateDistance () {
+        double dlon = Math.toRadians(longitude2) - Math.toRadians(longitude1);
+        double dlat = Math.toRadians(latitude2) - Math.toRadians(latitude1);
+
+        double a = Math.pow(Math.sin(dlat/2), 2) + Math.cos(latitude1) * Math.cos(latitude2) * Math.pow((Math.sin(dlon/2)),2);
+        double c = (2 * Math.atan2( Math.sqrt(a), Math.sqrt(1-a) ));
+        return R * c; // (where R is the radius of the Earth);
+    }
+
     private class CompassWork implements Runnable {
         @Override
         public void run() {
@@ -137,8 +143,6 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
             double azimuth = Math.toDegrees(orientationValues[0]);
             currentDirection = (azimuth + 360) % 360;
-
-//            Log.d("Calc", "CurrentDirection: " + currentDirection);
         }
     }
 
@@ -152,6 +156,9 @@ public class MyService extends Service implements LocationListener, SensorEventL
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
 
+        if (sensorManager == null){
+            throw new Error("sensorManager null pointer exception");
+        }
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 
@@ -163,21 +170,43 @@ public class MyService extends Service implements LocationListener, SensorEventL
             return;
         }
 
-
         boolean gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
         boolean networkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
 
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, this);
-        if (!gpsEnabled && !networkEnabled) {
+
+        Location lastKnownLocation = null;
+
+        if (networkEnabled) {
+            lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+        } else if (gpsEnabled) {
+            lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+        } else {
             Toast.makeText(this, "GPS and Network providers not enabled", Toast.LENGTH_SHORT).show();
         }
+
+        if (lastKnownLocation != null) {
+            latitude1 = lastKnownLocation.getLatitude();
+            longitude1 = lastKnownLocation.getLongitude();
+
+            latitude2 = lastKnownLocation.getLatitude();
+            longitude2 = lastKnownLocation.getLongitude();
+
+            initialLatitude = lastKnownLocation.getLatitude();
+            initialLongitude = lastKnownLocation.getLongitude();
+
+            sendLocationToActivity();
+        }
+
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
         locationManager.removeUpdates(this);
+        sensorManager.unregisterListener(this, accelerometer);
+        sensorManager.unregisterListener(this, rotationVectorSensor);
     }
 
     @Override
@@ -185,13 +214,10 @@ public class MyService extends Service implements LocationListener, SensorEventL
         switch (sensorEvent.sensor.getType()) {
             case Sensor.TYPE_LINEAR_ACCELERATION:
                 linearAccelerationData = sensorEvent.values.clone();
-                AccelWork accelWork = new AccelWork(linearAccelerationData, sensorEvent.timestamp);
-                myHandler.post(accelWork);
-//                Log.d("onSensorChanged", "Linear Accel: " + Arrays.toString(linearAccelerationData));
+                myHandler.post(new AccelWork(linearAccelerationData, sensorEvent.timestamp));
                 break;
             case Sensor.TYPE_ROTATION_VECTOR:
                 rotationVector = sensorEvent.values.clone();
-//                Log.d("onSensorChanged", "rotationVector: " + Arrays.toString(rotationVector));
                 break;
         }
 
@@ -210,14 +236,6 @@ public class MyService extends Service implements LocationListener, SensorEventL
         if (location.getLatitude() != 0.0 && location.getLongitude() != 0.0) {
             latitude1 = location.getLatitude();
             longitude1 = location.getLongitude();
-//        Log.d("onLocationChanged", latitude1 + " : " + longitude1);
-
-            if (initialLatitude == 0.0 && initialLongitude == 0.0){
-                initialLatitude = latitude1;
-                initialLongitude = longitude1;
-                latitude2 = latitude1;
-                longitude2 = longitude1;
-            }
 
             sendLocationToActivity();
         }
@@ -248,17 +266,5 @@ public class MyService extends Service implements LocationListener, SensorEventL
         intent.putExtra("distance", distance);
 
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-    }
-
-
-    public double calculateDistance () {
-        double dlon = Math.toRadians(longitude2) - Math.toRadians(longitude1);
-        double dlat = Math.toRadians(latitude2) - Math.toRadians(latitude1);
-
-        double a = Math.pow(Math.sin(dlat/2), 2) + Math.cos(latitude1) * Math.cos(latitude2) * Math.pow((Math.sin(dlon/2)),2);
-        double c = (2 * Math.atan2( Math.sqrt(a), Math.sqrt(1-a) ));
-        double d = R * c; // (where R is the radius of the Earth);
-
-        return d;
     }
 }

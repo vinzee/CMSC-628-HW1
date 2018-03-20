@@ -17,6 +17,8 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
@@ -41,8 +43,8 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             latitudeEditText.setText(Double.valueOf(this.latitude1).toString());
             longitudeEditText.setText(Double.valueOf(this.longitude1).toString());
-            latitude2EditText.setText(Double.valueOf(this.latitude2).toString());
-            longitude2EditText.setText(Double.valueOf(this.longitude2).toString());
+            latitude2EditText.setText(String.format("%.10f", this.latitude2));
+            longitude2EditText.setText(String.format("%.10f", this.longitude2));
             distanceEditText.setText(Double.valueOf(this.distance).toString());
         }
     }
@@ -59,12 +61,18 @@ public class MainActivity extends AppCompatActivity {
         longitude2EditText = findViewById(R.id.lng2);
         distanceEditText = findViewById(R.id.distance);
 
-        Intent myIntent = new Intent(this, MyService.class);
-        bindService(myIntent, myServiceConnection, BIND_AUTO_CREATE);
+        Button button = findViewById(R.id.button);
+        button.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v) {
+                Intent myIntent = new Intent(MainActivity.this, MyService.class);
+                bindService(myIntent, myServiceConnection, BIND_AUTO_CREATE);
 
-        IntentFilter intentFIlter = new IntentFilter();
-        intentFIlter.addAction("locationValues");
-        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver, intentFIlter);
+                IntentFilter intentFIlter = new IntentFilter();
+                intentFIlter.addAction("locationValues");
+                LocalBroadcastManager.getInstance(MainActivity.this).registerReceiver(mMessageReceiver, intentFIlter);
+            }
+        });
     }
 
     @Override
@@ -79,7 +87,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
-//        myService.stopService();
     }
 
     private ServiceConnection myServiceConnection = new ServiceConnection() {
@@ -98,11 +105,11 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, int[] grantResults) {
         if (requestCode == 99) {
             // Request for location permission.
-            if (grantResults.length == 2 && grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+            if (grantResults.length == 2 && (grantResults[0] == PackageManager.PERMISSION_GRANTED || grantResults[1] == PackageManager.PERMISSION_GRANTED)) {
                 // Permission has been granted.
-                Toast.makeText(this, "GPS Location permission granted", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Location permission granted", Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "GPS Location permission not granted", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Location permission not granted", Toast.LENGTH_SHORT).show();
             }
         }
     }
