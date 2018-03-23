@@ -178,10 +178,13 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
         Location lastKnownLocation = null;
 
-        if (networkEnabled) {
-            lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-        } else if (gpsEnabled) {
+        // check GPS signal first, if not found check for network signal
+        if (gpsEnabled) {
+            // outdoor
             lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+        } else if (networkEnabled) {
+            // indoor
+            lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
         } else {
             Toast.makeText(this, "GPS and Network providers not enabled", Toast.LENGTH_SHORT).show();
         }
@@ -198,7 +201,6 @@ public class MyService extends Service implements LocationListener, SensorEventL
 
             sendLocationToActivity();
         }
-
     }
 
     @Override

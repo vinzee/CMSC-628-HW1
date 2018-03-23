@@ -61,6 +61,12 @@ public class MainActivity extends AppCompatActivity {
         longitude2EditText = findViewById(R.id.lng2);
         distanceEditText = findViewById(R.id.distance);
 
+        latitudeEditText.setEnabled(false);
+        longitudeEditText.setEnabled(false);
+        longitude2EditText.setEnabled(false);
+        latitude2EditText.setEnabled(false);
+        distanceEditText.setEnabled(false);
+
         Button button = findViewById(R.id.button);
         button.setOnClickListener(new View.OnClickListener(){
             @Override
