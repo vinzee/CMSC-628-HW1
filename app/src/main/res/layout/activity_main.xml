@@ -4,7 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.example.vinzee.cmsc_628_hw1.MainActivity">
+    tools:context="com.example.vinzee.cmsc_628_hw1.MainActivity"
+    android:windowSoftInputMode="stateHidden">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -47,7 +48,7 @@
                 android:layout_weight="1"
                 android:ems="10"
                 android:hint="Latitude 1"
-                android:inputType="none"
+                android:textColor="@color/colorBlack"
                 />
 
             <EditText
@@ -57,7 +58,8 @@
                 android:layout_weight="1"
                 android:ems="10"
                 android:hint="Longitude 1"
-                android:inputType="none" />
+                android:textColor="@color/colorBlack"
+                />
         </LinearLayout>
 
         <LinearLayout
@@ -92,7 +94,7 @@
                 android:layout_weight="1"
                 android:ems="10"
                 android:hint="Latitude 2"
-                android:inputType="none"
+                android:textColor="@color/colorBlack"
                 />
 
             <EditText
@@ -102,7 +104,8 @@
                 android:layout_weight="1"
                 android:ems="10"
                 android:hint="Longitude 2"
-                android:inputType="none" />
+                android:textColor="@color/colorBlack"
+                />
         </LinearLayout>
 
         <LinearLayout
@@ -137,7 +140,7 @@
                 android:layout_weight="1"
                 android:ems="10"
                 android:hint="Distance"
-                android:inputType="none"
+                android:textColor="@color/colorBlack"
                 />
         </LinearLayout>
 
