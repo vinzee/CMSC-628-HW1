@@ -239,6 +239,14 @@ public class MyService extends Service implements LocationListener, SensorEventL
             latitude1 = location.getLatitude();
             longitude1 = location.getLongitude();
 
+            if (latitude2 != 0.0 && longitude2 != 0.0) {
+                latitude2 = location.getLatitude();
+                longitude2 = location.getLongitude();
+
+                initialLatitude = location.getLatitude();
+                initialLongitude = location.getLongitude();
+            }
+
             sendLocationToActivity();
         }
     }
